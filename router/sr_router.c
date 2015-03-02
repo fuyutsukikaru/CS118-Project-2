@@ -80,17 +80,31 @@ void sr_handlepacket(struct sr_instance* sr,
 
   /* fill in code here */
 
-  if (len < sizeof(sr_ethernet_hdr_t)) {
-    fprintf(stderr, "%s\n", "Failed to load ethernet header (length too short)");
+  int minlength = sizeof(sr_ethernet_hdr_t);
+  if (len < minlength) {
+    fprintf(stderr, "Failed to load ethernet header, insufficient length\n");
     return;
   }
 
   uint16_t et = ethertype(packet);
 
   if (et == ethertype_ip) {
-    /* do ip stuff */
+    minlength += sizeof(sr_ip_hdr_t);
+    if (len < minlength) {
+      fprintf(stderr, "Failed to load IP header, insufficient length\n");
+      return;
+    } else {
+      sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+    }
   } else if (et == ethertype_arp) {
+    minlength += sizeof(sr_arp_hdr_t);
+    if (len < minlength) {
+      fprintf(stderr, "Failed to load ARP header, insufficient length\n");
+      return;
+    } else {
+      sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
 
+    }
   } else {
     fprintf(stderr, "Unrecognized type: %d", et);
   }
