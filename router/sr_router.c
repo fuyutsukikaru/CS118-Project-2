@@ -80,6 +80,19 @@ void sr_handlepacket(struct sr_instance* sr,
 
   /* fill in code here */
 
-  fprintf(stdout, "%s\n", interface);
+  if (len < sizeof(sr_ethernet_hdr_t)) {
+    fprintf(stderr, "%s\n", "Failed to load ethernet header (length too short)");
+    return;
+  }
+
+  uint16_t et = ethertype(packet);
+
+  if (et == ethertype_ip) {
+    /* do ip stuff */
+  } else if (et == ethertype_arp) {
+
+  } else {
+    fprintf(stderr, "Unrecognized type: %d", et);
+  }
 }/* end sr_ForwardPacket */
 
