@@ -45,7 +45,7 @@ void sr_init(struct sr_instance* sr)
     pthread_t thread;
 
     pthread_create(&thread, &(sr->attr), sr_arpcache_timeout, sr);
-    
+
     /* Add initialization code here! */
 
 } /* -- sr_init -- */
@@ -80,5 +80,6 @@ void sr_handlepacket(struct sr_instance* sr,
 
   /* fill in code here */
 
+  fprintf(stdout, "%s\n", interface);
 }/* end sr_ForwardPacket */
 
