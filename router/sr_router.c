@@ -90,11 +90,18 @@ void sr_handlepacket(struct sr_instance* sr,
 
   if (et == ethertype_ip) {
     minlength += sizeof(sr_ip_hdr_t);
+
+    sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+    uint32_t cks = cksum(ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
+
     if (len < minlength) {
       fprintf(stderr, "Failed to load IP header, insufficient length\n");
       return;
+    } else if (ip_hdr->ip_sum != cks) {
+      fprintf(stderr, "Checksum mismatch\n");
+      return;
     } else {
-      sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+
     }
   } else if (et == ethertype_arp) {
     minlength += sizeof(sr_arp_hdr_t);
@@ -103,7 +110,11 @@ void sr_handlepacket(struct sr_instance* sr,
       return;
     } else {
       sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+      if (ntohs(arp_hdr->ar_op) == arp_op_request) {
 
+      } else if (ntohs(arp_hdr->ar_op) == arp_op_reply) {
+
+      }
     }
   } else {
     fprintf(stderr, "Unrecognized type: %d", et);
