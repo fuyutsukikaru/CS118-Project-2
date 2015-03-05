@@ -114,7 +114,7 @@ void sr_handlepacket(struct sr_instance* sr,
       sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
       if (ntohs(arp_hdr->ar_op) == arp_op_request) {
         print_hdr_arp(arp_hdr);
-        send_arp_reply(sr, arp_hdr, interface);
+        sr_send_arp_reply(sr, arp_hdr, interface);
       } else if (ntohs(arp_hdr->ar_op) == arp_op_reply) {
 
       }
@@ -124,7 +124,7 @@ void sr_handlepacket(struct sr_instance* sr,
   }
 }/* end sr_ForwardPacket */
 
-void send_arp_reply(struct sr_instance* sr, sr_arp_hdr_t* arp_hdr, char* interface) {
+void sr_send_arp_reply(struct sr_instance* sr, sr_arp_hdr_t* arp_hdr, char* interface) {
   struct sr_if* iface = sr_get_interface(sr, interface);
 
   uint8_t* packet = malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
