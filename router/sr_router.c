@@ -92,7 +92,7 @@ void sr_handlepacket(struct sr_instance* sr,
     minlength += sizeof(sr_ip_hdr_t);
 
     sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
-    uint32_t cks = cksum(ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
+    uint32_t cks = cksum(ip_hdr, ip_hdr->ip_hl);
 
     if (len < minlength) {
       fprintf(stderr, "Failed to load IP header, insufficient length\n");
@@ -111,7 +111,8 @@ void sr_handlepacket(struct sr_instance* sr,
     } else {
       sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
       if (ntohs(arp_hdr->ar_op) == arp_op_request) {
-
+        print_hdr_arp(arp_hdr);
+        send_arp_reply(sr, arp_hdr, interface);
       } else if (ntohs(arp_hdr->ar_op) == arp_op_reply) {
 
       }
@@ -120,4 +121,29 @@ void sr_handlepacket(struct sr_instance* sr,
     fprintf(stderr, "Unrecognized type: %d", et);
   }
 }/* end sr_ForwardPacket */
+
+void send_arp_reply(struct sr_instance* sr, sr_arp_hdr_t* arp_hdr, char* interface) {
+  struct sr_if* iface = sr_get_interface(sr, interface);
+
+  uint8_t* packet = malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
+  sr_ethernet_hdr_t* ether_hdr = (sr_ethernet_hdr_t *)packet;
+  memcpy(ether_hdr->ether_dhost, arp_hdr->ar_sha, ETHER_ADDR_LEN);
+  memcpy(ether_hdr->ether_shost, iface->addr, ETHER_ADDR_LEN);
+  ether_hdr->ether_type = htons(ethertype_arp);
+
+  sr_arp_hdr_t* reply_arp_hdr = (sr_arp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+  reply_arp_hdr->ar_hrd = htons(arp_hrd_ethernet);
+  reply_arp_hdr->ar_pro = htons(ethertype_ip);
+  reply_arp_hdr->ar_hln = arp_hdr->ar_hln;
+  reply_arp_hdr->ar_pln = arp_hdr->ar_pln;
+  reply_arp_hdr->ar_op = htons(arp_op_reply);
+  memcpy(reply_arp_hdr->ar_sha, iface->addr, ETHER_ADDR_LEN);
+  reply_arp_hdr->ar_sip = iface->ip;
+  memcpy(reply_arp_hdr->ar_tha, arp_hdr->ar_sha, ETHER_ADDR_LEN);
+  reply_arp_hdr->ar_tip = arp_hdr->ar_sip;
+
+  print_hdr_arp(reply_arp_hdr);
+  sr_send_packet(sr, packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t), interface);
+  free(packet);
+}
 
