@@ -92,12 +92,14 @@ void sr_handlepacket(struct sr_instance* sr,
     minlength += sizeof(sr_ip_hdr_t);
 
     sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
-    uint32_t cks = cksum(ip_hdr, ip_hdr->ip_hl);
+    uint16_t ipsum = ip_hdr->ip_sum;
+    ip_hdr->ip_sum = 0; /* checksum field is assumed to be 0 for calculation */
+    uint32_t cks = cksum(ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
 
     if (len < minlength) {
       fprintf(stderr, "Failed to load IP header, insufficient length\n");
       return;
-    } else if (ip_hdr->ip_sum != cks) {
+    } else if (ipsum != cks) {
       fprintf(stderr, "Checksum mismatch\n");
       return;
     } else {
