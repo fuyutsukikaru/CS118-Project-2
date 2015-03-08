@@ -17,6 +17,10 @@
   See the comments in the header file for an idea of what it should look like.
 */
 
+/*void sr_send_arp_request(struct sr_instance* sr, uint8_t* packet, unsigned int len, char* interface) {
+  sr_send_packet(sr, packet, len, interface);
+}*/
+
 void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req) {
   time_t curtime = time(NULL);
   if (difftime(curtime, req->sent) > 1.0) {
@@ -27,7 +31,7 @@ void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req) {
       /* send arp request */
       struct sr_packet *iter = req->packets;
       while (iter != NULL) {
-        sr_handlepacket(sr, iter->buf, iter->len, iter->iface);
+        sr_send_packet(sr, iter->buf, iter->len, iter->iface);
         iter = iter->next;
       }
       req->sent = curtime;
