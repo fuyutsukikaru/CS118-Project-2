@@ -11,6 +11,7 @@
  *
  **********************************************************************/
 
+#include <ctype.h>
 #include <stdio.h>
 #include <assert.h>
 
@@ -88,6 +89,7 @@ void sr_handlepacket(struct sr_instance* sr,
 
   uint16_t et = ethertype(packet);
 
+  /* Handle IP protocol */
   if (et == ethertype_ip) {
     minlength += sizeof(sr_ip_hdr_t);
 
@@ -95,6 +97,12 @@ void sr_handlepacket(struct sr_instance* sr,
     uint16_t ipsum = ip_hdr->ip_sum;
     ip_hdr->ip_sum = 0; /* checksum field is assumed to be 0 for calculation */
     uint32_t cks = cksum(ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
+
+    print_hdr_ip(packet);
+    print_addr_ip(sr->routing_table->dest);
+    print_addr_ip_int(ntohs(ip_hdr->ip_dst));
+    printf("Routing Table is: ");
+    sr_print_routing_table(sr);
 
     if (len < minlength) {
       fprintf(stderr, "Failed to load IP header, insufficient length\n");
@@ -149,3 +157,73 @@ void sr_send_arp_reply(struct sr_instance* sr, sr_arp_hdr_t* arp_hdr, char* inte
   free(packet);
 }
 
+/* no one knows if this works */
+struct in_addr sr_longest_prefix_match(uint32_t ip_dst, struct sr_rt* rt) {
+  struct sr_rt* cur_entry = rt;
+
+  /* bit shifting magic */
+  uint32_t tokenized_ip_dst [4] = {0};
+  tokenized_ip_dst[0] = ip_dst >> 24;
+  tokenized_ip_dst[1] = (ip_dst << 8) >> 24;
+  tokenized_ip_dst[2] = (ip_dst << 16) >> 24;
+  tokenized_ip_dst[3] = (ip_dst << 24) >> 24;
+
+  int rt_num_matches[10] = {0};
+  size_t rt_index = 0;
+
+  /* iterate through each entry in the routing table */
+  while (cur_entry) {
+    char cur_ip_dst[INET_ADDRSTRLEN];
+    if (inet_ntop(AF_INET, &(cur_entry->dest), cur_ip_dst, 100) == NULL) {
+      fprintf(stderr,"inet_ntop error on address conversion\n");
+    } else {
+      int num_matches = 0;
+      /* tokenize dest IP address */
+      char cur_ip_digit = '\0';
+      unsigned char ip_split[4] = {0};
+      size_t byte_index = 0;
+      size_t ip_index = 0;
+
+      int still_matching = 1;
+
+      while (cur_ip_digit = *(cur_ip_dst+ip_index)) {
+        if (isdigit((unsigned char) cur_ip_digit)) {
+          ip_split[byte_index] *= 10;
+          ip_split[byte_index] += cur_ip_digit - '0';
+        } else {
+          /* test for a match */
+          if (tokenized_ip_dst[byte_index] == (uint32_t) ip_split[byte_index] && still_matching) {
+            num_matches++;
+          } else {
+            still_matching = 0;
+          }
+          byte_index++;
+        }
+        ip_index++;
+      }
+
+      rt_num_matches[rt_index] = num_matches;
+      rt_index++;
+    }
+    cur_entry = cur_entry->next;
+  }
+
+  /* find the index of the longest prefix matching entry */
+  int index_max = 0;
+  int i = 1;
+  for (; i < sizeof(rt_num_matches) / sizeof(rt_num_matches[0]); i++) {
+    if (rt_num_matches[i] > rt_num_matches[index_max]) {
+      index_max = i;
+    }
+  }
+
+  /* return the destination address of that entry */
+  cur_entry = rt;
+  int cur_index = 0;
+  while (cur_entry) {
+    if (cur_index == index_max) {
+      return cur_entry->dest;
+    }
+    cur_entry = cur_entry->next;
+  }
+}

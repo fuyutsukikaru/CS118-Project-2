@@ -58,6 +58,11 @@ struct sr_instance
     FILE* logfile;
 };
 
+struct trie_node {
+  struct trie_node* table[256];
+  uint32_t ip;
+};
+
 /* -- sr_main.c -- */
 int sr_verify_routing_table(struct sr_instance* sr);
 
