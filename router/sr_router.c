@@ -119,9 +119,24 @@ void sr_handlepacket(struct sr_instance* sr,
         struct sr_arpreq* req = sr_arpcache_insert(&sr->cache, arp_hdr->ar_sha, arp_hdr->ar_sip);
         if (req) {
           struct sr_packet* pkt = req->packets;
+          struct sr_arpentry* entry;
+          struct sr_if* iface = sr_get_interface(sr, interface);
           while (pkt) {
-            sr_send_packet(sr, pkt->buf, pkt->len, pkt->iface);
-            pkt = pkt->next;
+            entry = sr_arpcache_lookup(&sr->cache, req->ip);
+            if (entry) {
+              sr_ethernet_hdr_t* ether_hdr = (sr_ethernet_hdr_t *)(pkt->buf);
+              memcpy(ether_hdr->ether_dhost, entry->mac, ETHER_ADDR_LEN);
+              memcpy(ether_hdr->ether_shost, iface->addr, ETHER_ADDR_LEN);
+
+
+              sr_send_packet(sr, pkt->buf, pkt->len, pkt->iface);
+              pkt = pkt->next;
+
+            } else {
+              fprintf(stderr, "Queueing request\n");
+              sr_arpcache_queuereq(&sr->cache, req->ip, pkt->buf, pkt->len, pkt->iface);
+            }
+
           }
         }
         sr_arpreq_destroy(&sr->cache, req);
