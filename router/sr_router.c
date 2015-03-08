@@ -128,16 +128,16 @@ void sr_handlepacket(struct sr_instance* sr,
               memcpy(ether_hdr->ether_dhost, entry->mac, ETHER_ADDR_LEN);
               memcpy(ether_hdr->ether_shost, iface->addr, ETHER_ADDR_LEN);
 
-
               sr_send_packet(sr, pkt->buf, pkt->len, pkt->iface);
               pkt = pkt->next;
-
             } else {
               fprintf(stderr, "Queueing request\n");
-              sr_arpcache_queuereq(&sr->cache, req->ip, pkt->buf, pkt->len, pkt->iface);
+              req = sr_arpcache_queuereq(&sr->cache, req->ip, pkt->buf, pkt->len, pkt->iface);
+              handle_arpreq(sr, req);
             }
 
           }
+          free(entry);
         }
         sr_arpreq_destroy(&sr->cache, req);
       }
