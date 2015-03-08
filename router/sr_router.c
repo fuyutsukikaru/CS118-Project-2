@@ -116,7 +116,15 @@ void sr_handlepacket(struct sr_instance* sr,
         print_hdr_arp(arp_hdr);
         sr_send_arp_reply(sr, arp_hdr, interface);
       } else if (ntohs(arp_hdr->ar_op) == arp_op_reply) {
-
+        struct sr_arpreq* req = sr_arpcache_insert(&sr->cache, arp_hdr->ar_sha, arp_hdr->ar_sip);
+        if (req) {
+          struct sr_packet* pkt = req->packets;
+          while (pkt) {
+            sr_send_packet(sr, pkt->buf, pkt->len, pkt->iface);
+            pkt = pkt->next;
+          }
+        }
+        sr_arpreq_destroy(&sr->cache, req);
       }
     }
   } else {
