@@ -29,11 +29,7 @@ void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req) {
       sr_arpreq_destroy(&(sr->cache), req);
     } else {
       /* send arp request */
-      struct sr_packet *iter = req->packets;
-      while (iter != NULL) {
-        sr_send_packet(sr, iter->buf, iter->len, iter->iface);
-        iter = iter->next;
-      }
+      sr_send_arp_request(sr, req);
       req->sent = curtime;
       req->times_sent++;
     }

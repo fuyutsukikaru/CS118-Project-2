@@ -20,7 +20,6 @@
 #include "sr_rt.h"
 #include "sr_router.h"
 #include "sr_protocol.h"
-#include "sr_arpcache.h"
 #include "sr_utils.h"
 
 /*---------------------------------------------------------------------
@@ -177,16 +176,51 @@ void sr_send_arp_reply(struct sr_instance* sr, sr_arp_hdr_t* arp_hdr, char* inte
   sr_arp_hdr_t* reply_arp_hdr = (sr_arp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
   reply_arp_hdr->ar_hrd = htons(arp_hrd_ethernet);
   reply_arp_hdr->ar_pro = htons(ethertype_ip);
-  reply_arp_hdr->ar_hln = arp_hdr->ar_hln;
-  reply_arp_hdr->ar_pln = arp_hdr->ar_pln;
+  reply_arp_hdr->ar_hln = 0x06; /* 6 bytes for ethernet */
+  reply_arp_hdr->ar_pln = 0x04; /* 4 bytes for ip */
   reply_arp_hdr->ar_op = htons(arp_op_reply);
   memcpy(reply_arp_hdr->ar_sha, iface->addr, ETHER_ADDR_LEN);
   reply_arp_hdr->ar_sip = iface->ip;
   memcpy(reply_arp_hdr->ar_tha, arp_hdr->ar_sha, ETHER_ADDR_LEN);
   reply_arp_hdr->ar_tip = arp_hdr->ar_sip;
 
-  print_hdr_arp(reply_arp_hdr);
+  print_hdr_arp((uint8_t *)reply_arp_hdr);
   sr_send_packet(sr, packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t), interface);
+  free(packet);
+}
+
+void sr_send_arp_request(struct sr_instance* sr, struct sr_arpreq* req) {
+  uint8_t* packet = malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
+  struct sr_rt* rte = sr_longest_prefix_match(sr, req->ip);
+
+  if (!rte) {
+    fprintf(stderr, "Router cannot reach destination ip\n");
+    print_addr_ip_int(req->ip);
+    free(packet);
+    return;
+  }
+
+  struct sr_if* iface = sr_get_interface(sr, rte->interface);
+  sr_ethernet_hdr_t* ether_hdr = (sr_ethernet_hdr_t *)packet;
+
+  /* arp requests are sent to broadcast mac address */
+  memset(ether_hdr->ether_dhost, 0xff, ETHER_ADDR_LEN);
+  memcpy(ether_hdr->ether_shost, iface->addr, ETHER_ADDR_LEN);
+  ether_hdr->ether_type = htons(ethertype_arp);
+
+  sr_arp_hdr_t* request_arp_hdr = (sr_arp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+  request_arp_hdr->ar_hrd = htons(arp_hrd_ethernet);
+  request_arp_hdr->ar_pro = htons(ethertype_ip);
+  request_arp_hdr->ar_hln = 0x06; /* 6 bytes for ethernet */
+  request_arp_hdr->ar_pln = 0x04; /* 4 bytes for ip */
+  request_arp_hdr->ar_op = htons(arp_op_request);
+  memcpy(request_arp_hdr->ar_sha, iface->addr, ETHER_ADDR_LEN);
+  request_arp_hdr->ar_sip = iface->ip;
+  memset(request_arp_hdr->ar_tha, 0x00, ETHER_ADDR_LEN);
+  request_arp_hdr->ar_tip = req->ip;
+
+  print_hdr_arp((uint8_t *)request_arp_hdr);
+  sr_send_packet(sr, packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t), iface->name);
   free(packet);
 }
 
