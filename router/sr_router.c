@@ -99,10 +99,12 @@ void sr_handlepacket(struct sr_instance* sr,
     uint32_t cks = cksum(ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
 
     print_hdr_ip(packet);
-    print_addr_ip(sr->routing_table->dest);
-    print_addr_ip_int(ntohs(ip_hdr->ip_dst));
+    print_addr_ip_int(ntohl(ip_hdr->ip_dst));
     printf("Routing Table is: ");
     sr_print_routing_table(sr);
+    struct sr_rt* matching_entry = sr_longest_prefix_match(sr, ntohl(ip_hdr->ip_dst));
+    printf("Matching entry is: ");
+    print_addr_ip(matching_entry->dest);
 
     if (len < minlength) {
       fprintf(stderr, "Failed to load IP header, insufficient length\n");
@@ -180,16 +182,59 @@ void sr_send_arp_reply(struct sr_instance* sr, sr_arp_hdr_t* arp_hdr, char* inte
   free(packet);
 }
 
-/* no one knows if this works */
-struct in_addr sr_longest_prefix_match(uint32_t ip_dst, struct sr_rt* rt) {
-  struct sr_rt* cur_entry = rt;
+/* LPM: The Easy Way */
+struct sr_rt* sr_longest_prefix_match(struct sr_instance* sr, uint32_t ip_dst) {
+  struct sr_rt* lpm_entry = 0;
+  int longest_match_bits = 0;
+  struct sr_rt* cur_entry = sr->routing_table;
+  while (cur_entry) {
+    uint32_t mask = ntohl(cur_entry->mask.s_addr);
+    uint32_t dest = ntohl(cur_entry->dest.s_addr);
+    int matched_bits = 0;
+    int all_matched = 1;
+
+    int i = 31;
+
+    /* bit shifting magic */
+    while (all_matched && ((mask & 1 << i) >> i) && i >= 0) {
+      int bit_1 = ((ip_dst & 1 << i) >> i);
+      int bit_2 = ((dest & 1 << i) >> i);
+
+      if (bit_1 == bit_2) {
+        matched_bits++;
+        i--;
+      } else {
+        all_matched = 0;
+      }
+    }
+
+    if (!lpm_entry || (matched_bits >= longest_match_bits && all_matched)) {
+        lpm_entry = cur_entry;
+        longest_match_bits = matched_bits;
+    }
+
+    cur_entry = cur_entry->next;
+  }
+
+  return lpm_entry;
+}
+
+/* LPM: The Hard Way */
+struct sr_rt* sr_longest_prefix_match_bad(struct sr_instance* sr, uint32_t ip_dst) {
+  struct sr_rt* cur_entry = sr->routing_table;
 
   /* bit shifting magic */
-  uint32_t tokenized_ip_dst [4] = {0};
+  uint32_t tokenized_ip_dst[4] = {0};
   tokenized_ip_dst[0] = ip_dst >> 24;
   tokenized_ip_dst[1] = (ip_dst << 8) >> 24;
   tokenized_ip_dst[2] = (ip_dst << 16) >> 24;
   tokenized_ip_dst[3] = (ip_dst << 24) >> 24;
+
+  /* truncate zeroes */
+
+
+  printf("Wtf is going on 3: %d", tokenized_ip_dst[3]);
+  print_addr_ip_int(tokenized_ip_dst[3]);
 
   int rt_num_matches[10] = {0};
   size_t rt_index = 0;
@@ -241,11 +286,11 @@ struct in_addr sr_longest_prefix_match(uint32_t ip_dst, struct sr_rt* rt) {
   }
 
   /* return the destination address of that entry */
-  cur_entry = rt;
+  cur_entry = sr->routing_table;
   int cur_index = 0;
   while (cur_entry) {
     if (cur_index == index_max) {
-      return cur_entry->dest;
+      return cur_entry;
     }
     cur_entry = cur_entry->next;
   }
