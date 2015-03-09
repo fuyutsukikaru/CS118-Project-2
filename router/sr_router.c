@@ -98,14 +98,6 @@ void sr_handlepacket(struct sr_instance* sr,
     ip_hdr->ip_sum = 0; /* checksum field is assumed to be 0 for calculation */
     uint32_t cks = cksum(ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
 
-    print_hdr_ip(packet);
-    print_addr_ip_int(ntohl(ip_hdr->ip_dst));
-    printf("Routing Table is: ");
-    sr_print_routing_table(sr);
-    struct sr_rt* matching_entry = sr_longest_prefix_match(sr, ntohl(ip_hdr->ip_dst));
-    printf("Matching entry is: ");
-    print_addr_ip(matching_entry->dest);
-
     if (len < minlength) {
       fprintf(stderr, "Failed to load IP header, insufficient length\n");
       return;
@@ -113,7 +105,23 @@ void sr_handlepacket(struct sr_instance* sr,
       fprintf(stderr, "Checksum mismatch\n");
       return;
     } else {
+      print_hdr_ip(packet);
+      ip_hdr->ip_ttl--;
 
+      print_addr_ip_int(ntohl(ip_hdr->ip_dst));
+      printf("Routing Table is: ");
+      print_addr_ip_int(ntohl(sr->routing_table->dest.s_addr));
+      sr_print_routing_table(sr);
+      struct sr_rt* matching_entry = sr_longest_prefix_match(sr, ntohl(ip_hdr->ip_dst));
+      printf("Matching entry is: ");
+      print_addr_ip(matching_entry->dest);
+
+      ip_hdr->ip_sum = 0; /* checksum field is assumed to be 0 for calculation */
+      uint32_t new_cks = cksum(ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
+
+      if (ip_hdr->ip_dst != ntohl(matching_entry->dest.s_addr)); {
+        /* do something if it needs to be forwarded */
+      }
     }
   } else if (et == ethertype_arp) {
     minlength += sizeof(sr_arp_hdr_t);
@@ -184,7 +192,7 @@ void sr_send_arp_reply(struct sr_instance* sr, sr_arp_hdr_t* arp_hdr, char* inte
 
 /* LPM: The Easy Way */
 struct sr_rt* sr_longest_prefix_match(struct sr_instance* sr, uint32_t ip_dst) {
-  struct sr_rt* lpm_entry = 0;
+  struct sr_rt* lpm_entry = NULL;
   int longest_match_bits = 0;
   struct sr_rt* cur_entry = sr->routing_table;
   while (cur_entry) {
@@ -208,7 +216,7 @@ struct sr_rt* sr_longest_prefix_match(struct sr_instance* sr, uint32_t ip_dst) {
       }
     }
 
-    if (!lpm_entry || (matched_bits >= longest_match_bits && all_matched)) {
+    if (!lpm_entry || (matched_bits >= longest_match_bits || all_matched)) {
         lpm_entry = cur_entry;
         longest_match_bits = matched_bits;
     }
@@ -218,4 +226,3 @@ struct sr_rt* sr_longest_prefix_match(struct sr_instance* sr, uint32_t ip_dst) {
 
   return lpm_entry;
 }
-
