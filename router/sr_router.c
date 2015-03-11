@@ -129,6 +129,14 @@ void sr_handlepacket(struct sr_instance* sr,
       uint32_t new_cks = cksum(ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
       ip_hdr->ip_sum = new_cks;
 
+      struct sr_arpentry* entry = sr_arpcache_lookup(&sr->cache, ip_hdr->ip_dst);
+      if (entry) {
+        /* use entry->mac mapping */
+        free(entry);
+      } else {
+        struct sr_arpreq* req = sr_arpcache_queuereq(&sr->cache, ntohl(matching_entry->dest.s_addr), packet, len, interface);
+        /* handle_arpreq(req); this function needs to be exposed */
+      }
     }
   } else if (et == ethertype_arp) {
     fprintf(stderr, "Received an ARP packet!\n");
