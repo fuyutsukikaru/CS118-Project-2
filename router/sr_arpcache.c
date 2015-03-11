@@ -25,6 +25,7 @@ void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req) {
   time_t curtime = time(NULL);
   if (difftime(curtime, req->sent) > 1.0) {
     if (req->times_sent >= 5) {
+      fprintf(stderr, "Host unreachable!\n");
       /* send icmp host unreachable to source addr */
       sr_arpreq_destroy(&(sr->cache), req);
     } else {
