@@ -116,6 +116,8 @@ void sr_handlepacket(struct sr_instance* sr,
 
       print_hdr_ip(packet);
       ip_hdr->ip_ttl--;
+      ip_hdr->ip_sum = 0; /* checksum field is assumed to be 0 for calculation */
+      ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
 
       print_addr_ip_int(ntohl(ip_hdr->ip_dst));
       printf("Routing Table is: ");
@@ -125,18 +127,12 @@ void sr_handlepacket(struct sr_instance* sr,
       printf("Matching entry is: ");
       print_addr_ip(matching_entry->dest);
 
-      ip_hdr->ip_sum = 0; /* checksum field is assumed to be 0 for calculation */
-      uint32_t new_cks = cksum(ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
-      ip_hdr->ip_sum = new_cks;
-
-      struct sr_arpentry* entry = sr_arpcache_lookup(&sr->cache, ip_hdr->ip_dst);
-      if (entry) {
-        /* use entry->mac mapping */
-        free(entry);
-      } else {
-        struct sr_arpreq* req = sr_arpcache_queuereq(&sr->cache, ntohl(matching_entry->dest.s_addr), packet, len, interface);
-        /* handle_arpreq(req); this function needs to be exposed */
+      if (ip_hdr->ip_ttl == 0) {
+        /* time exceeded, send icmp */
       }
+
+      fprintf(stderr, "Now forwarding packet\n");
+      sr_send_ip_packet(sr, packet, len, interface);
     }
   } else if (et == ethertype_arp) {
     fprintf(stderr, "Received an ARP packet!\n");
@@ -155,6 +151,7 @@ void sr_handlepacket(struct sr_instance* sr,
         fprintf(stderr, "It was a reply!\n");
         struct sr_arpreq* req = sr_arpcache_insert(&sr->cache, arp_hdr->ar_sha, arp_hdr->ar_sip);
         if (req) {
+          fprintf(stderr, "Now handling packets waiting on reply\n");
           struct sr_packet* pkt = req->packets;
           struct sr_arpentry* entry;
           struct sr_if* iface = sr_get_interface(sr, interface);
@@ -196,6 +193,27 @@ struct sr_if*  sr_find_matching_interface(struct sr_instance* sr, uint32_t ip) {
   }
 
   return 0;
+}
+
+void sr_send_ip_packet(struct sr_instance* sr, uint8_t* packet, uint32_t len, char* interface) {
+  sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+  struct sr_arpentry* entry = sr_arpcache_lookup(&sr->cache, ip_hdr->ip_dst);
+  struct sr_if* iface = sr_get_interface(sr, interface);
+
+  if (entry) {
+    sr_ethernet_hdr_t* ether_hdr = (sr_ethernet_hdr_t *)packet;
+    memcpy(ether_hdr->ether_dhost, entry->mac, ETHER_ADDR_LEN);
+    memcpy(ether_hdr->ether_shost, iface->addr, ETHER_ADDR_LEN);
+    sr_send_packet(sr, packet, len, interface);
+
+    fprintf(stderr, "Sending a packet to %s from %s\n", entry->mac, iface->addr);
+
+    free(entry);
+    free(iface);
+  } else {
+    fprintf(stderr, "Couldn't find entry, queueing arp\n");
+    sr_arpcache_queuereq(&sr->cache, ip_hdr->ip_dst, packet, len, interface);
+  }
 }
 
 void sr_send_arp_reply(struct sr_instance* sr, sr_arp_hdr_t* arp_hdr, char* interface) {
