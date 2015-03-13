@@ -76,7 +76,7 @@ int sr_read_from_server(struct sr_instance* );
 void sr_init(struct sr_instance* );
 void sr_handlepacket(struct sr_instance* , uint8_t * , unsigned int , char* );
 struct sr_if* sr_find_matching_interface(struct sr_instance*, uint32_t);
-void sr_send_ip_packet(struct sr_instance*, uint8_t*, uint32_t, char*);
+void sr_send_ip_packet(struct sr_instance*, uint8_t*, uint32_t, uint32_t, char*);
 void sr_send_arp_reply(struct sr_instance*, sr_arp_hdr_t*, char*);
 void sr_send_arp_request(struct sr_instance*, struct sr_arpreq*);
 struct sr_rt* sr_longest_prefix_match(struct sr_instance*, uint32_t);

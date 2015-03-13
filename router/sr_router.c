@@ -110,10 +110,8 @@ void sr_handlepacket(struct sr_instance* sr,
       return;
     } else if (dest_iface) {
       fprintf(stderr, "IP packet is for us\n");
-
     } else {
       fprintf(stderr, "IP packet needs to be forwarded\n");
-
       print_hdr_ip(packet);
       ip_hdr->ip_ttl--;
       ip_hdr->ip_sum = 0; /* checksum field is assumed to be 0 for calculation */
@@ -123,16 +121,23 @@ void sr_handlepacket(struct sr_instance* sr,
       printf("Routing Table is: ");
       print_addr_ip_int(ntohl(sr->routing_table->dest.s_addr));
       sr_print_routing_table(sr);
-      struct sr_rt* matching_entry = sr_longest_prefix_match(sr, ntohl(ip_hdr->ip_dst));
-      printf("Matching entry is: ");
+      struct sr_rt* matching_entry = sr_longest_prefix_match(sr, ip_hdr->ip_dst);
+      fprintf(stderr, "Matching entry is: ");
       print_addr_ip(matching_entry->dest);
 
       if (ip_hdr->ip_ttl == 0) {
         /* time exceeded, send icmp */
+        fprintf(stderr, "time exceeded\n");
+        return;
+      }
+
+      if (!matching_entry) {
+        fprintf(stderr, "Destination unreachable\n");
+        return;
       }
 
       fprintf(stderr, "Now forwarding packet\n");
-      sr_send_ip_packet(sr, packet, len, interface);
+      sr_send_ip_packet(sr, packet, matching_entry->gw.s_addr, len, interface);
     }
   } else if (et == ethertype_arp) {
     fprintf(stderr, "Received an ARP packet!\n");
@@ -162,6 +167,8 @@ void sr_handlepacket(struct sr_instance* sr,
               memcpy(ether_hdr->ether_dhost, entry->mac, ETHER_ADDR_LEN);
               memcpy(ether_hdr->ether_shost, iface->addr, ETHER_ADDR_LEN);
 
+              fprintf(stderr, "Sending packet to: ");
+              print_addr_eth(entry->mac);
               sr_send_packet(sr, pkt->buf, pkt->len, pkt->iface);
               pkt = pkt->next;
             } else {
@@ -195,9 +202,9 @@ struct sr_if*  sr_find_matching_interface(struct sr_instance* sr, uint32_t ip) {
   return 0;
 }
 
-void sr_send_ip_packet(struct sr_instance* sr, uint8_t* packet, uint32_t len, char* interface) {
+void sr_send_ip_packet(struct sr_instance* sr, uint8_t* packet, uint32_t tip, uint32_t len, char* interface) {
   sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
-  struct sr_arpentry* entry = sr_arpcache_lookup(&sr->cache, ip_hdr->ip_dst);
+  struct sr_arpentry* entry = sr_arpcache_lookup(&sr->cache, tip);
   struct sr_if* iface = sr_get_interface(sr, interface);
 
   if (entry) {
@@ -206,13 +213,13 @@ void sr_send_ip_packet(struct sr_instance* sr, uint8_t* packet, uint32_t len, ch
     memcpy(ether_hdr->ether_shost, iface->addr, ETHER_ADDR_LEN);
     sr_send_packet(sr, packet, len, interface);
 
-    fprintf(stderr, "Sending a packet to %s from %s\n", entry->mac, iface->addr);
+    fprintf(stderr, "Sending a packet to ");
+    print_addr_eth(entry->mac);
 
     free(entry);
-    free(iface);
   } else {
     fprintf(stderr, "Couldn't find entry, queueing arp\n");
-    sr_arpcache_queuereq(&sr->cache, ip_hdr->ip_dst, packet, len, interface);
+    sr_arpcache_queuereq(&sr->cache, tip, packet, len, interface);
   }
 }
 
@@ -254,6 +261,8 @@ void sr_send_arp_request(struct sr_instance* sr, struct sr_arpreq* req) {
     return;
   }
 
+  fprintf(stderr, "Matched interface: %s\n", rte->interface);
+
   struct sr_if* iface = sr_get_interface(sr, rte->interface);
   sr_ethernet_hdr_t* ether_hdr = (sr_ethernet_hdr_t *)packet;
 
@@ -273,7 +282,7 @@ void sr_send_arp_request(struct sr_instance* sr, struct sr_arpreq* req) {
   memset(request_arp_hdr->ar_tha, 0x00, ETHER_ADDR_LEN);
   request_arp_hdr->ar_tip = req->ip;
 
-  /*print_hdr_arp((uint8_t *)request_arp_hdr);*/
+  print_hdr_arp((uint8_t *)request_arp_hdr);
   sr_send_packet(sr, packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t), iface->name);
   free(packet);
 }
