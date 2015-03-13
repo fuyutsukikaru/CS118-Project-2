@@ -112,6 +112,14 @@ void sr_handlepacket(struct sr_instance* sr,
     } else {
       fprintf(stderr, "IP packet needs to be forwarded\n");
       print_hdr_ip(packet);
+
+      if (ip_hdr->ip_ttl == 1) {
+        /* time exceeded, send icmp */
+        fprintf(stderr, "time exceeded\n");
+        sr_send_icmp(sr, packet, interface, TIME_EXCEEDED_TYPE, TIME_EXCEEDED_CODE);
+        return;
+      }
+
       ip_hdr->ip_ttl--;
       ip_hdr->ip_sum = 0; /* checksum field is assumed to be 0 for calculation */
       ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
@@ -122,14 +130,9 @@ void sr_handlepacket(struct sr_instance* sr,
       fprintf(stderr, "Matching entry is: ");
       print_addr_ip(matching_entry->dest);
 
-      if (ip_hdr->ip_ttl == 0) {
-        /* time exceeded, send icmp */
-        fprintf(stderr, "time exceeded\n");
-        return;
-      }
-
       if (!matching_entry) {
         fprintf(stderr, "Destination unreachable\n");
+        sr_send_icmp(sr, packet, interface, DEST_HOST_UNREACHABLE_TYPE, DEST_HOST_UNREACHABLE_CODE);
         return;
       }
 
