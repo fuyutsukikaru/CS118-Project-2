@@ -132,14 +132,15 @@ void sr_handlepacket(struct sr_instance* sr,
       print_addr_ip_int(ntohl(ip_hdr->ip_dst));
 
       struct sr_rt* matching_entry = sr_longest_prefix_match(sr, ntohl(ip_hdr->ip_dst));
-      fprintf(stderr, "Matching entry is: ");
-      print_addr_ip(matching_entry->dest);
 
       if (!matching_entry) {
-        fprintf(stderr, "Destination unreachable\n");
-        sr_send_icmp(sr, packet, interface, DEST_HOST_UNREACHABLE_TYPE, DEST_HOST_UNREACHABLE_CODE);
+        fprintf(stderr, "Destination unreachable LPM FAILED\n");
+        sr_send_icmp(sr, packet, interface, DEST_NET_UNREACHABLE_TYPE, DEST_NET_UNREACHABLE_CODE);
         return;
       }
+
+      fprintf(stderr, "Matching entry is: ");
+      print_addr_ip(matching_entry->dest);
 
       fprintf(stderr, "Now forwarding packet\n");
       sr_send_ip_packet(sr, packet, matching_entry->gw.s_addr, len, matching_entry->interface);
@@ -383,15 +384,21 @@ struct sr_rt* sr_longest_prefix_match(struct sr_instance* sr, uint32_t ip_dst) {
         i--;
       } else {
         all_matched = 0;
+        break;
       }
     }
 
-    if (!lpm_entry || (matched_bits >= longest_match_bits || all_matched)) {
+    if ((matched_bits > longest_match_bits || all_matched)) {
         lpm_entry = cur_entry;
         longest_match_bits = matched_bits;
     }
 
     cur_entry = cur_entry->next;
+  }
+
+  printf("Matched %d bits\n", longest_match_bits);
+  if (longest_match_bits < 24) {
+    return NULL;
   }
 
   return lpm_entry;
