@@ -112,6 +112,12 @@ void sr_handlepacket(struct sr_instance* sr,
     } else if (dest_iface) {
       fprintf(stderr, "IP packet is for us\n");
 
+      /* double check these */
+      if (ip_hdr->ip_p == 1) {
+        sr_send_icmp(sr, packet, interface, ECHO_REPLY_TYPE, 0);
+      } else {
+        sr_send_icmp(sr, packet, interface, PORT_UNREACHABLE_TYPE, PORT_UNREACHABLE_CODE);
+      }
 
     } else {
       fprintf(stderr, "IP packet needs to be forwarded\n");
