@@ -99,7 +99,7 @@ void sr_handlepacket(struct sr_instance* sr,
     uint32_t cks = cksum(ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
 
     fprintf(stderr, "Target ip is\n");
-    print_addr_ip_int(ip_hdr->ip_dst);
+    print_addr_ip_int(ntohl(ip_hdr->ip_dst));
     struct sr_if* dest_iface = sr_find_matching_interface(sr, ip_hdr->ip_dst);
 
     if (len < minlength) {
@@ -119,9 +119,7 @@ void sr_handlepacket(struct sr_instance* sr,
       ip_hdr->ip_sum = 0; /* checksum field is assumed to be 0 for calculation */
       ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
 
-      print_addr_ip_int(ntohl(ip_hdr->ip_dst));
       printf("Routing Table is: ");
-      print_addr_ip_int(ntohl(sr->routing_table->dest.s_addr));
       sr_print_routing_table(sr);
       struct sr_rt* matching_entry = sr_longest_prefix_match(sr, ntohl(ip_hdr->ip_dst));
       printf("Matching entry is: ");
@@ -129,6 +127,7 @@ void sr_handlepacket(struct sr_instance* sr,
 
       if (ip_hdr->ip_ttl == 0) {
         /* time exceeded, send icmp */
+        printf("TTL is zero!!!\n");
       }
 
       fprintf(stderr, "Now forwarding packet\n");
