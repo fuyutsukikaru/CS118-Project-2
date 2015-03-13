@@ -195,6 +195,7 @@ struct sr_if*  sr_find_matching_interface(struct sr_instance* sr, uint32_t ip) {
 }
 
 void sr_send_ip_packet(struct sr_instance* sr, uint8_t* packet, uint32_t len, char* interface) {
+  fprintf(stderr, "Entering send_ip_packet\n");
   sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
   struct sr_arpentry* entry = sr_arpcache_lookup(&sr->cache, ip_hdr->ip_dst);
   struct sr_if* iface = sr_get_interface(sr, interface);
@@ -277,7 +278,7 @@ void sr_send_arp_request(struct sr_instance* sr, struct sr_arpreq* req) {
   free(packet);
 }
 
-void send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, unsigned int type, unsigned int code) {
+void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, unsigned int type, unsigned int code) {
   uint8_t* icmp_packet = (uint8_t*) malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
   sr_ethernet_hdr_t* ether_hdr = (sr_ethernet_hdr_t*) icmp_packet;
   sr_ip_hdr_t* ip_hdr = (sr_ip_hdr_t*)(icmp_packet + sizeof(sr_ethernet_hdr_t));
@@ -301,6 +302,10 @@ void send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, unsigne
   ip_hdr->ip_p = ip_protocol_icmp;
   ip_hdr->ip_src = iface->ip;
   ip_hdr->ip_dst = recv_ip_hdr->ip_src;
+  fprintf(stderr, "ICMP SOURCE IP is: \n");
+  print_addr_ip_int(ntohl(ip_hdr->ip_src));
+  fprintf(stderr, "ICMP DEST IP is: \n");
+  print_addr_ip_int(ntohl(ip_hdr->ip_dst));
   ip_hdr->ip_sum = cksum((void*) ip_hdr, sizeof(sr_ip_hdr_t));
 
   /* Fill out the ethernet headers */
