@@ -15,7 +15,6 @@
 #include <stdio.h>
 #include <assert.h>
 
-
 #include "sr_if.h"
 #include "sr_rt.h"
 #include "sr_router.h"
@@ -286,19 +285,38 @@ void sr_send_arp_request(struct sr_instance* sr, struct sr_arpreq* req) {
 }
 
 void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, unsigned int type, unsigned int code) {
-  uint8_t* icmp_packet = (uint8_t*) malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
+  uint8_t* icmp_packet;
+  if (type == 3) {
+    icmp_packet  = (uint8_t*) malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
+  } else {
+    icmp_packet = (uint8_t*) malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t));
+  }
   sr_ethernet_hdr_t* ether_hdr = (sr_ethernet_hdr_t*) icmp_packet;
   sr_ip_hdr_t* ip_hdr = (sr_ip_hdr_t*)(icmp_packet + sizeof(sr_ethernet_hdr_t));
-  sr_icmp_t3_hdr_t* icmp_hdr = (sr_icmp_t3_hdr_t*)(icmp_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+  sr_icmp_t3_hdr_t* icmp_t3_hdr;
+  sr_icmp_hdr_t* icmp_hdr;
+
   struct sr_if* iface = sr_get_interface(sr, interface);
   sr_ethernet_hdr_t* recv_ethernet_hdr = (sr_ethernet_hdr_t*) packet;
   sr_ip_hdr_t* recv_ip_hdr = (sr_ip_hdr_t*)(packet + sizeof(sr_ethernet_hdr_t));
 
-  /* Fill out the ICMP headers */
-  icmp_hdr->icmp_type = type;
-  icmp_hdr->icmp_code = code;
-  memcpy(icmp_hdr->data, recv_ip_hdr, ICMP_DATA_SIZE);
-  icmp_hdr->icmp_sum = cksum((void*) icmp_hdr, sizeof(sr_icmp_t3_hdr_t));
+  if (type == 3) {
+    icmp_t3_hdr = (sr_icmp_t3_hdr_t*)(icmp_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+
+    /* Fill out the ICMP headers */
+    icmp_t3_hdr->icmp_type = type;
+    icmp_t3_hdr->icmp_code = code;
+    memcpy(icmp_t3_hdr->data, recv_ip_hdr, ICMP_DATA_SIZE);
+    icmp_t3_hdr->icmp_sum = 0;
+    icmp_t3_hdr->icmp_sum = cksum((void*) icmp_t3_hdr, sizeof(sr_icmp_t3_hdr_t));
+  } else {
+    icmp_hdr = (sr_icmp_hdr_t*)(icmp_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+
+    icmp_hdr->icmp_type = type;
+    icmp_hdr->icmp_code = code;
+    icmp_hdr->icmp_sum = 0;
+    icmp_hdr->icmp_sum = cksum((void*) icmp_hdr, sizeof(sr_icmp_hdr_t));
+  }
 
   /* Fill out the IP headers */
   ip_hdr->ip_hl = recv_ip_hdr->ip_hl;
@@ -313,6 +331,7 @@ void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, unsi
   print_addr_ip_int(ntohl(ip_hdr->ip_src));
   fprintf(stderr, "ICMP DEST IP is: \n");
   print_addr_ip_int(ntohl(ip_hdr->ip_dst));
+  ip_hdr->ip_sum = 0;
   ip_hdr->ip_sum = cksum((void*) ip_hdr, sizeof(sr_ip_hdr_t));
 
   /* Fill out the ethernet headers */
@@ -320,7 +339,13 @@ void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, unsi
   memcpy(ether_hdr->ether_shost, iface->addr, ETHER_ADDR_LEN);
   ether_hdr->ether_type = htons(ethertype_ip);
 
-  sr_send_packet(sr, icmp_packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t), iface->name);
+  print_hdr_icmp(icmp_packet);
+
+  if (type == 3) {
+    sr_send_packet(sr, icmp_packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t), iface->name);
+  } else {
+    sr_send_packet(sr, icmp_packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t), iface->name);
+  }
 }
 
 /* LPM: The Easy Way */
