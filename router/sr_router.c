@@ -151,8 +151,6 @@ void sr_handlepacket(struct sr_instance* sr,
         return;
       }
 
-      fprintf(stderr, "Matching entry is: ");
-      print_addr_ip(matching_entry->dest);
 
       fprintf(stderr, "Now forwarding packet\n");
       sr_send_ip_packet(sr, packet, matching_entry->gw.s_addr, len, matching_entry->interface);
@@ -382,11 +380,10 @@ struct sr_rt* sr_longest_prefix_match(struct sr_instance* sr, uint32_t ip_dst) {
         i--;
       } else {
         all_matched = 0;
-        break;
       }
     }
 
-    if ((matched_bits > longest_match_bits || all_matched)) {
+    if (!lpm_entry || (matched_bits > longest_match_bits && all_matched)) {
         lpm_entry = cur_entry;
         longest_match_bits = matched_bits;
     }
@@ -396,8 +393,10 @@ struct sr_rt* sr_longest_prefix_match(struct sr_instance* sr, uint32_t ip_dst) {
 
   printf("Matched %d bits\n", longest_match_bits);
   if (longest_match_bits < 24) {
-    return NULL;
+    printf("How do I fail?\n", longest_match_bits);
   }
 
+  printf("Matched entry is: ");
+  print_addr_ip(lpm_entry->dest);
   return lpm_entry;
 }
