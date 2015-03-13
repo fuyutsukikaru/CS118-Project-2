@@ -380,10 +380,11 @@ struct sr_rt* sr_longest_prefix_match(struct sr_instance* sr, uint32_t ip_dst) {
         i--;
       } else {
         all_matched = 0;
+        break;
       }
     }
 
-    if (!lpm_entry || (matched_bits > longest_match_bits && all_matched)) {
+    if (matched_bits > longest_match_bits || all_matched) {
         lpm_entry = cur_entry;
         longest_match_bits = matched_bits;
     }
@@ -393,7 +394,8 @@ struct sr_rt* sr_longest_prefix_match(struct sr_instance* sr, uint32_t ip_dst) {
 
   printf("Matched %d bits\n", longest_match_bits);
   if (longest_match_bits < 24) {
-    printf("How do I fail?\n", longest_match_bits);
+    printf("Now do I fail?\n", longest_match_bits);
+    return NULL;
   }
 
   printf("Matched entry is: ");
