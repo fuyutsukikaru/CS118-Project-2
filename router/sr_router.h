@@ -18,6 +18,7 @@
 #include "sr_protocol.h"
 #include "sr_arpcache.h"
 
+
 /* we dont like this debug , but what to do for varargs ? */
 #ifdef _DEBUG_
 #define Debug(x, args...) printf(x, ## args)
@@ -28,6 +29,17 @@
 #define Debug(x, args...) do{}while(0)
 #define DebugMAC(x) do{}while(0)
 #endif
+
+/* Globals */
+#define ECHO_REPLY_TYPE 0
+#define DEST_NET_UNREACHABLE_TYPE 3
+#define DEST_NET_UNREACHABLE_CODE 0
+#define DEST_HOST_UNREACHABLE_TYPE 3
+#define DEST_HOST_UNREACHABLE_CODE 1
+#define PORT_UNREACHABLE_TYPE 3
+#define PORT_UNREACHABLE_CODE 3
+#define TIME_EXCEEDED_TYPE 11
+#define TIME_EXCEEDED_CODE 0
 
 #define INIT_TTL 255
 #define PACKET_DUMP_SIZE 1024
@@ -79,6 +91,7 @@ struct sr_if* sr_find_matching_interface(struct sr_instance*, uint32_t);
 void sr_send_ip_packet(struct sr_instance*, uint8_t*, uint32_t, uint32_t, char*);
 void sr_send_arp_reply(struct sr_instance*, sr_arp_hdr_t*, char*);
 void sr_send_arp_request(struct sr_instance*, struct sr_arpreq*);
+void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, unsigned int type, unsigned int code);
 struct sr_rt* sr_longest_prefix_match(struct sr_instance*, uint32_t);
 
 /* -- sr_if.c -- */
