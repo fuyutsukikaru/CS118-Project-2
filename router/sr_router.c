@@ -314,7 +314,7 @@ void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, uint
   sr_ethernet_hdr_t* ether_hdr = (sr_ethernet_hdr_t*)icmp_packet;
   sr_ip_hdr_t* ip_hdr = (sr_ip_hdr_t *)(icmp_packet + sizeof(sr_ethernet_hdr_t));
 
-  struct sr_rt* match = sr_longest_prefix_match(sr, ntohl(recv_ip_hdr->ip_dst));
+  struct sr_rt* match = sr_longest_prefix_match(sr, ntohl(recv_ip_hdr->ip_src));
   struct sr_if* iface = sr_get_interface(sr, match->interface);
 
   memcpy(ip_hdr, recv_ip_hdr, ntohs(recv_ip_hdr->ip_len));
@@ -332,8 +332,8 @@ void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, uint
   } else {
     sr_icmp_hdr_t* icmp_hdr = (sr_icmp_hdr_t *)(icmp_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
 
-    icmp_hdr->icmp_type = htons(type);
-    icmp_hdr->icmp_code = htons(code);
+    icmp_hdr->icmp_type = type;
+    icmp_hdr->icmp_code = code;
     icmp_hdr->icmp_sum = 0;
     icmp_hdr->icmp_sum = cksum((uint8_t *)icmp_hdr, sizeof(sr_icmp_hdr_t));
   }
@@ -341,10 +341,20 @@ void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, uint
   /* Fill out the IP headers */
   ip_hdr->ip_ttl = 64;
   ip_hdr->ip_p = ip_protocol_icmp;
-  ip_hdr->ip_src = recv_ip_hdr->ip_dst;
   ip_hdr->ip_dst = recv_ip_hdr->ip_src;
   ip_hdr->ip_sum = 0;
-  ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
+
+  if (code == 3) {
+    ip_hdr->ip_src = recv_ip_hdr->ip_dst;
+  } else {
+    ip_hdr->ip_src = iface->ip;
+  }
+
+  if (type == 3) {
+    ip_hdr->ip_sum = cksum((uint8_t *)ip_hdr, sizeof(sr_ip_hdr_t));
+  } else {
+    ip_hdr->ip_sum = cksum((uint8_t *)ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
+  }
 
   /* sr_send_ip_packet will fill out the ethernet header */
   memset(ether_hdr->ether_dhost, 0x00, ETHER_ADDR_LEN);
@@ -352,7 +362,7 @@ void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, uint
   ether_hdr->ether_type = htons(ethertype_ip);
 
   fprintf(stderr, "Wrapping ICMP header in ");
-  print_hdrs(icmp_packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t));
+  print_hdrs(icmp_packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
 
   sr_send_ip_packet(sr, icmp_packet, match->gw.s_addr, sizeof(sr_ethernet_hdr_t) + ntohs(recv_ip_hdr->ip_len), iface->name);
 }
