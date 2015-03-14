@@ -31,6 +31,8 @@
 #endif
 
 /* Globals */
+#define ECHO_REQUEST_TYPE 8
+#define ECHO_REQUEST_CODE 0
 #define ECHO_REPLY_TYPE 0
 #define DEST_NET_UNREACHABLE_TYPE 3
 #define DEST_NET_UNREACHABLE_CODE 0
