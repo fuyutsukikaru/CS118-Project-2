@@ -77,6 +77,8 @@ void sr_handlepacket(struct sr_instance* sr,
 
   printf("*** -> Received packet of length %d \n",len);
 
+  /*sr_send_icmp(sr, packet, interface, DEST_HOST_UNREACHABLE_TYPE, DEST_HOST_UNREACHABLE_CODE);*/
+
   /* fill in code here */
 
   int minlength = sizeof(sr_ethernet_hdr_t);
@@ -297,7 +299,7 @@ void sr_send_arp_request(struct sr_instance* sr, struct sr_arpreq* req) {
   free(packet);
 }
 
-void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, unsigned int type, unsigned int code) {
+void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, uint8_t type, uint8_t code) {
   uint8_t* icmp_packet;
   if (type == 3) {
     icmp_packet  = (uint8_t*) malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
@@ -319,14 +321,15 @@ void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, unsi
     /* Fill out the ICMP headers */
     icmp_t3_hdr->icmp_type = type;
     icmp_t3_hdr->icmp_code = code;
+    icmp_t3_hdr->unused = 0;
     memcpy(icmp_t3_hdr->data, recv_ip_hdr, ICMP_DATA_SIZE);
     icmp_t3_hdr->icmp_sum = 0;
     icmp_t3_hdr->icmp_sum = cksum((void*) icmp_t3_hdr, sizeof(sr_icmp_t3_hdr_t));
   } else {
     icmp_hdr = (sr_icmp_hdr_t*)(icmp_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
 
-    icmp_hdr->icmp_type = type;
-    icmp_hdr->icmp_code = code;
+    icmp_hdr->icmp_type = htons(type);
+    icmp_hdr->icmp_code = htons(code);
     icmp_hdr->icmp_sum = 0;
     icmp_hdr->icmp_sum = cksum((void*) icmp_hdr, sizeof(sr_icmp_hdr_t));
   }
@@ -339,13 +342,17 @@ void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, unsi
   ip_hdr->ip_ttl = 64;
   ip_hdr->ip_p = ip_protocol_icmp;
   ip_hdr->ip_src = iface->ip;
-  ip_hdr->ip_dst = recv_ip_hdr->ip_src;
+  if (type == 0) {
+    ip_hdr->ip_dst = recv_ip_hdr->ip_dst;
+  } else {
+    ip_hdr->ip_dst = recv_ip_hdr->ip_src;
+  }
   fprintf(stderr, "ICMP SOURCE IP is: \n");
   print_addr_ip_int(ntohl(ip_hdr->ip_src));
   fprintf(stderr, "ICMP DEST IP is: \n");
   print_addr_ip_int(ntohl(ip_hdr->ip_dst));
   ip_hdr->ip_sum = 0;
-  ip_hdr->ip_sum = cksum((void*) ip_hdr, sizeof(sr_ip_hdr_t));
+  ip_hdr->ip_sum = cksum(ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
 
   /* Fill out the ethernet headers */
   memcpy(ether_hdr->ether_dhost, recv_ethernet_hdr->ether_shost, ETHER_ADDR_LEN);
