@@ -117,10 +117,10 @@ void sr_handlepacket(struct sr_instance* sr,
         sr_icmp_hdr_t* icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
         if (icmp_hdr->icmp_type == ECHO_REQUEST_TYPE && icmp_hdr->icmp_code == ECHO_REQUEST_CODE) {
           fprintf(stderr, "Received an echo request, sending reply\n");
-          sr_send_icmp(sr, packet, len, interface, ECHO_REPLY_TYPE, 0);
+          sr_send_icmp(sr, packet, interface, ECHO_REPLY_TYPE, 0);
         }
       } else {
-        sr_send_icmp(sr, packet, len, interface, PORT_UNREACHABLE_TYPE, PORT_UNREACHABLE_CODE);
+        sr_send_icmp(sr, packet, interface, PORT_UNREACHABLE_TYPE, PORT_UNREACHABLE_CODE);
       }
 
     } else {
@@ -130,7 +130,7 @@ void sr_handlepacket(struct sr_instance* sr,
       if (ip_hdr->ip_ttl == 1) {
         /* time exceeded, send icmp */
         fprintf(stderr, "time exceeded\n");
-        sr_send_icmp(sr, packet, len, interface, TIME_EXCEEDED_TYPE, TIME_EXCEEDED_CODE);
+        sr_send_icmp(sr, packet, interface, TIME_EXCEEDED_TYPE, TIME_EXCEEDED_CODE);
         return;
       }
 
@@ -147,7 +147,7 @@ void sr_handlepacket(struct sr_instance* sr,
 
       if (!matching_entry) {
         fprintf(stderr, "Destination unreachable LPM FAILED\n");
-        sr_send_icmp(sr, packet, len, interface, DEST_NET_UNREACHABLE_TYPE, DEST_NET_UNREACHABLE_CODE);
+        sr_send_icmp(sr, packet, interface, DEST_NET_UNREACHABLE_TYPE, DEST_NET_UNREACHABLE_CODE);
         return;
       }
 
@@ -307,7 +307,7 @@ void sr_send_arp_request(struct sr_instance* sr, struct sr_arpreq* req) {
   free(packet);
 }
 
-void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, unsigned int len, char* interface, uint8_t type, uint8_t code) {
+void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, uint8_t type, uint8_t code) {
   sr_ip_hdr_t* recv_ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
   uint8_t* icmp_packet = malloc(sizeof(sr_ethernet_hdr_t) + ntohs(recv_ip_hdr->ip_len));
 
