@@ -43,6 +43,9 @@
 #define TIME_EXCEEDED_TYPE 11
 #define TIME_EXCEEDED_CODE 0
 
+#define UDP_PROTOCOL_CODE 17
+#define TCP_PROTOCOL_CODE 6
+
 #define INIT_TTL 255
 #define PACKET_DUMP_SIZE 1024
 
@@ -93,7 +96,7 @@ struct sr_if* sr_find_matching_interface(struct sr_instance*, uint32_t);
 void sr_send_ip_packet(struct sr_instance*, uint8_t*, uint32_t, uint32_t, char*);
 void sr_send_arp_reply(struct sr_instance*, sr_arp_hdr_t*, char*);
 void sr_send_arp_request(struct sr_instance*, struct sr_arpreq*);
-void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, uint8_t type, uint8_t code);
+void sr_send_icmp(struct sr_instance*, uint8_t*, uint8_t, uint8_t, uint32_t, uint16_t, uint16_t, uint8_t*);
 struct sr_rt* sr_longest_prefix_match(struct sr_instance*, uint32_t);
 
 /* -- sr_if.c -- */

@@ -29,7 +29,20 @@ void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req) {
       /* send icmp host unreachable to source addr */
       struct sr_packet *iter = req->packets;
       while (iter != NULL) {
-        sr_send_icmp(sr, iter->buf, iter->iface, DEST_HOST_UNREACHABLE_TYPE, DEST_HOST_UNREACHABLE_CODE);
+        sr_ip_hdr_t* ip_hdr = (sr_ip_hdr_t *)iter->buf + sizeof(sr_ethernet_hdr_t);
+        sr_icmp_hdr_t* icmp_hdr = (sr_icmp_hdr_t *)ip_hdr + sizeof(sr_ip_hdr_t);
+
+        sr_send_icmp(
+          sr,
+          iter->buf,
+          DEST_NET_UNREACHABLE_TYPE,
+          DEST_NET_UNREACHABLE_CODE,
+          ntohs(ip_hdr->ip_len) - sizeof(sr_ip_hdr_t) - sizeof(sr_icmp_hdr_t),
+          icmp_hdr->icmp_dat1,
+          icmp_hdr->icmp_dat2,
+          (uint8_t *)ip_hdr + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t)
+        );
+
         iter = iter->next;
       }
       sr_arpreq_destroy(&(sr->cache), req);
