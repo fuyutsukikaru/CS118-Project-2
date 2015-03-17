@@ -149,7 +149,7 @@ void sr_handlepacket(struct sr_instance* sr,
 
     } else {
       fprintf(stderr, "IP packet needs to be forwarded\n");
-      print_hdr_ip(packet + sizeof(sr_ethernet_hdr_t));
+      print_hdr_ip(ip_hdr);
 
       if (ip_hdr->ip_ttl == 1) {
         /* time exceeded, send icmp */
@@ -159,10 +159,10 @@ void sr_handlepacket(struct sr_instance* sr,
           packet,
           TIME_EXCEEDED_TYPE,
           TIME_EXCEEDED_CODE,
-          ntohs(ip_hdr->ip_len) - sizeof(sr_ip_hdr_t) - sizeof(sr_icmp_hdr_t),
-          icmp_hdr->icmp_dat1,
-          icmp_hdr->icmp_dat2,
-          (uint8_t *)ip_hdr + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t)
+          ICMP_DATA_SIZE,
+          0,
+          0,
+          (uint8_t *)ip_hdr
         );
         return;
       }
@@ -185,10 +185,10 @@ void sr_handlepacket(struct sr_instance* sr,
           packet,
           DEST_NET_UNREACHABLE_TYPE,
           DEST_NET_UNREACHABLE_CODE,
-          ntohs(ip_hdr->ip_len) - sizeof(sr_ip_hdr_t) - sizeof(sr_icmp_hdr_t),
-          icmp_hdr->icmp_dat1,
-          icmp_hdr->icmp_dat2,
-          (uint8_t *)ip_hdr + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t)
+          ICMP_DATA_SIZE,
+          0,
+          0,
+          (uint8_t *)ip_hdr
         );
         return;
       }
@@ -230,6 +230,7 @@ void sr_handlepacket(struct sr_instance* sr,
               fprintf(stderr, "Sending waiting packet\n");
               print_hdr_eth(pkt->buf);
               print_hdr_ip((pkt->buf) + sizeof(sr_ethernet_hdr_t));
+              print_hdr_icmp((pkt->buf) + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
               sr_send_packet(sr, pkt->buf, pkt->len, pkt->iface);
               pkt = pkt->next;
             } else {
@@ -280,6 +281,7 @@ void sr_send_ip_packet(struct sr_instance* sr, uint8_t* packet, uint32_t tip, ui
   } else {
     fprintf(stderr, "Couldn't find entry, queueing arp\n");
     sr_arpcache_queuereq(&sr->cache, tip, packet, len, interface);
+    fprintf(stderr, "ARP QUEUED\n");
   }
 }
 
@@ -350,12 +352,11 @@ void sr_send_arp_request(struct sr_instance* sr, struct sr_arpreq* req) {
 
 /* Sends an ICMP packet. Length field is length of ICMP data field after header */
 void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, uint8_t type, uint8_t code, uint32_t len, uint16_t dat1, uint16_t dat2, uint8_t* payload) {
-
   uint32_t packet_length = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t) + len;
 
-  fprintf(stderr, "PACKET DATA IS %d LONG\n", packet_length);
   sr_ip_hdr_t* recv_ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
-  uint8_t* icmp_packet = malloc(packet_length);
+  /*uint8_t* icmp_packet = malloc(packet_length);*/
+  char icmp_packet[packet_length];
 
   sr_ethernet_hdr_t* ether_hdr = (sr_ethernet_hdr_t *)icmp_packet;
   sr_ip_hdr_t* ip_hdr = (sr_ip_hdr_t *)(icmp_packet + sizeof(sr_ethernet_hdr_t));
@@ -370,7 +371,8 @@ void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, uint8_t type, uint8_t
   icmp_hdr->icmp_code = code;
   icmp_hdr->icmp_dat1 = dat1;
   icmp_hdr->icmp_dat2 = dat2;
-  memcpy(icmp_hdr + 1, payload, len);
+  /*memcpy(icmp_hdr + 1, payload, len);*/
+  memcpy(&icmp_hdr[1], (char *)payload, len);
   icmp_hdr->icmp_sum = 0;
   icmp_hdr->icmp_sum = cksum(icmp_hdr, sizeof(sr_icmp_hdr_t) + len);
 
@@ -393,9 +395,9 @@ void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, uint8_t type, uint8_t
   ether_hdr->ether_type = htons(ethertype_ip);
 
   fprintf(stderr, "Wrapping ICMP header in ");
-  print_hdrs(icmp_packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t) + len);
+  print_hdrs((uint8_t *)icmp_packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t) + len);
 
-  sr_send_ip_packet(sr, icmp_packet, match->gw.s_addr, packet_length, iface->name);
+  sr_send_ip_packet(sr, (uint8_t *)icmp_packet, match->gw.s_addr, packet_length, iface->name);
 }
 
 /* LPM: The Easy Way */
