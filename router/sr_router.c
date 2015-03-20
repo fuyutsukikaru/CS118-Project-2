@@ -77,10 +77,6 @@ void sr_handlepacket(struct sr_instance* sr,
 
   printf("*** -> Received packet of length %d \n",len);
 
-  /*sr_send_icmp(sr, packet, interface, DEST_HOST_UNREACHABLE_TYPE, DEST_HOST_UNREACHABLE_CODE);*/
-
-  /* fill in code here */
-
   int minlength = sizeof(sr_ethernet_hdr_t);
   if (len < minlength) {
     fprintf(stderr, "Failed to load ethernet header, insufficient length\n");
@@ -363,11 +359,7 @@ void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, uint
   ip_hdr->ip_dst = recv_ip_hdr->ip_src;
   ip_hdr->ip_sum = 0;
 
-  /*if (code == 3) {
-    ip_hdr->ip_src = recv_ip_hdr->ip_dst;
-  } else {*/
-    ip_hdr->ip_src = iface->ip;
-  /*}*/
+  ip_hdr->ip_src = iface->ip;
 
   ip_hdr->ip_sum = cksum((uint8_t *)ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
 
