@@ -1,0 +1,22 @@
+Team:
+
+Project 2 - Simple Router
+
+Soomin Jeong
+UID: 304-116-854
+- handled arp caching
+- set up intial icmp skeleton code
+- implemented time exceeded and port unreachable icmp messages
+
+Jeffrey Wang
+UID: 104-148-158
+- format IP forwarding skeleton code
+- implemented longest prefix matching
+- debugged memory management issues
+
+James Wu
+UID: 204-135-990
+- set up initial handle packet code
+- implemented arp requests and replies
+- refactored icmp for better multiplexing
+- implemented echo replies, and host net unreachable
