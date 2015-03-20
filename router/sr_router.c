@@ -127,7 +127,7 @@ void sr_handlepacket(struct sr_instance* sr,
       fprintf(stderr, "IP packet needs to be forwarded\n");
       print_hdr_ip(packet + sizeof(sr_ethernet_hdr_t));
 
-      if (ip_hdr->ip_ttl == 1) {
+      if (ip_hdr->ip_ttl <= 1) {
         /* time exceeded, send icmp */
         fprintf(stderr, "time exceeded\n");
         sr_send_icmp(sr, packet, interface, TIME_EXCEEDED_TYPE, TIME_EXCEEDED_CODE);
@@ -308,8 +308,16 @@ void sr_send_arp_request(struct sr_instance* sr, struct sr_arpreq* req) {
 }
 
 void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, uint8_t type, uint8_t code) {
+  unsigned long icmp_len = 0;
+  if (type == 3) {
+    icmp_len = sizeof(sr_icmp_t3_hdr_t);
+  } else if (type == 11) {
+    icmp_len = sizeof(sr_icmp_t11_hdr_t);
+  } else {
+    icmp_len = sizeof(sr_icmp_hdr_t);
+  }
   sr_ip_hdr_t* recv_ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
-  uint8_t* icmp_packet = malloc(sizeof(sr_ethernet_hdr_t) + ntohs(recv_ip_hdr->ip_len));
+  uint8_t* icmp_packet = malloc(sizeof(sr_ethernet_hdr_t) + ntohs(recv_ip_hdr->ip_len) + icmp_len);
 
   sr_ethernet_hdr_t* ether_hdr = (sr_ethernet_hdr_t*)icmp_packet;
   sr_ip_hdr_t* ip_hdr = (sr_ip_hdr_t *)(icmp_packet + sizeof(sr_ethernet_hdr_t));
@@ -330,6 +338,15 @@ void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, uint
     memcpy(icmp_t3_hdr->data, recv_ip_hdr, ICMP_DATA_SIZE);
     icmp_t3_hdr->icmp_sum = 0;
     icmp_t3_hdr->icmp_sum = cksum((uint8_t *)icmp_t3_hdr, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
+  } else if (type == 11) {
+    sr_icmp_t11_hdr_t* icmp_t11_hdr = (sr_icmp_t11_hdr_t *)(icmp_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+
+    /* Fill out the ICMP headers */
+    icmp_t11_hdr->icmp_type = type;
+    icmp_t11_hdr->icmp_code = code;
+    memcpy(icmp_t11_hdr->data, recv_ip_hdr, ICMP_DATA_SIZE);
+    icmp_t11_hdr->icmp_sum = 0;
+    icmp_t11_hdr->icmp_sum = cksum((uint8_t *)icmp_t11_hdr, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t11_hdr_t));
   } else {
     sr_icmp_hdr_t* icmp_hdr = (sr_icmp_hdr_t *)(icmp_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
 
@@ -345,18 +362,13 @@ void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, uint
   ip_hdr->ip_dst = recv_ip_hdr->ip_src;
   ip_hdr->ip_sum = 0;
 
-  if (code == 3) {
+  /*if (code == 3) {
     ip_hdr->ip_src = recv_ip_hdr->ip_dst;
-  } else {
+  } else {*/
     ip_hdr->ip_src = iface->ip;
-  }
+  /*}*/
 
-  if (type == 3) {
-    /*ip_hdr->ip_sum = cksum((uint8_t *)ip_hdr, sizeof(sr_ip_hdr_t));*/
-    ip_hdr->ip_sum = cksum((uint8_t *)ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
-  } else {
-    ip_hdr->ip_sum = cksum((uint8_t *)ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
-  }
+  ip_hdr->ip_sum = cksum((uint8_t *)ip_hdr, ip_hdr->ip_hl * sizeof(unsigned int));
 
   /* sr_send_ip_packet will fill out the ethernet header */
   memset(ether_hdr->ether_dhost, 0x00, ETHER_ADDR_LEN);
@@ -364,7 +376,7 @@ void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, uint
   ether_hdr->ether_type = htons(ethertype_ip);
 
   fprintf(stderr, "Wrapping ICMP header in ");
-  print_hdrs(icmp_packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
+  print_hdrs(icmp_packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t11_hdr_t));
 
   sr_send_ip_packet(sr, icmp_packet, match->gw.s_addr, sizeof(sr_ethernet_hdr_t) + ntohs(recv_ip_hdr->ip_len), iface->name);
 }
