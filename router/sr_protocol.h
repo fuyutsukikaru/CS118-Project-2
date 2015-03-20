@@ -108,6 +108,7 @@ struct sr_icmp_t11_hdr {
   uint8_t icmp_type;
   uint8_t icmp_code;
   uint16_t icmp_sum;
+  uint32_t unused;
   uint8_t data[ICMP_DATA_SIZE];
 
 } __attribute__ ((packed)) ;

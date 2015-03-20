@@ -346,6 +346,7 @@ void sr_send_icmp(struct sr_instance* sr, uint8_t* packet, char* interface, uint
     icmp_t11_hdr->icmp_code = code;
     memcpy(icmp_t11_hdr->data, recv_ip_hdr, ICMP_DATA_SIZE);
     icmp_t11_hdr->icmp_sum = 0;
+    icmp_t11_hdr->unused = 0;
     icmp_t11_hdr->icmp_sum = cksum((uint8_t *)icmp_t11_hdr, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t11_hdr_t));
   } else {
     sr_icmp_hdr_t* icmp_hdr = (sr_icmp_hdr_t *)(icmp_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
