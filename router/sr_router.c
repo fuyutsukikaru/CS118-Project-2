@@ -197,9 +197,9 @@ void sr_handlepacket(struct sr_instance* sr,
             }
 
           }
-          free(entry);
+          /*free(entry);*/
         }
-        sr_arpreq_destroy(&sr->cache, req);
+        /*sr_arpreq_destroy(&sr->cache, req);*/
       }
     }
   } else {
@@ -235,7 +235,7 @@ void sr_send_ip_packet(struct sr_instance* sr, uint8_t* packet, uint32_t tip, ui
     fprintf(stderr, "Sending an IP packet to ");
     print_addr_eth(entry->mac);
 
-    free(entry);
+    /*free(entry);*/
   } else {
     fprintf(stderr, "Couldn't find entry, queueing arp\n");
     sr_arpcache_queuereq(&sr->cache, tip, packet, len, interface);
